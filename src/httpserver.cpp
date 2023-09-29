@@ -27,7 +27,6 @@
 #include <cstdlib>
 #include <deque>
 #include <memory>
-#include <numeric>
 #include <optional>
 #include <string>
 #include <unordered_set>
@@ -200,13 +199,6 @@ public:
     void RemoveConnection(const evhttp_connection* conn)
     {
         WITH_LOCK(m_mutex, RemoveConnectionInternal(conn));
-    }
-
-    size_t CountActiveRequests() const
-    {
-        LOCK(m_mutex);
-        return std::accumulate(m_tracker.begin(), m_tracker.end(), size_t(0),
-            [](size_t acc_count, const auto& pair) { return acc_count + pair.second; });
     }
     size_t CountActiveConnections() const { return WITH_LOCK(m_mutex, return m_tracker.size()); }
     //! Wait until there are no more connections with active requests in the tracker
@@ -536,7 +528,7 @@ void StopHTTPServer()
     boundSockets.clear();
     {
         if (g_requests.CountActiveConnections() != 0) {
-            LogPrint(BCLog::HTTP, "Waiting for %d requests to stop HTTP server\n", g_requests.CountActiveRequests());
+            LogPrint(BCLog::HTTP, "Waiting for %d connections to stop HTTP server\n", g_requests.CountActiveConnections());
         }
         g_requests.WaitUntilEmpty();
     }
