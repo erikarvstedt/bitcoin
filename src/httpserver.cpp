@@ -163,13 +163,10 @@ private:
     //! For each connection, keep a counter of how many requests are open
     std::unordered_map<const evhttp_connection*, size_t> m_tracker GUARDED_BY(m_mutex);
 
-    void RemoveConnectionInternal(const evhttp_connection* conn) EXCLUSIVE_LOCKS_REQUIRED(m_mutex)
+    void RemoveConnectionInternal(const decltype(m_tracker)::iterator it) EXCLUSIVE_LOCKS_REQUIRED(m_mutex)
     {
-        auto it{m_tracker.find(Assert(conn))};
-        if (it != m_tracker.end()) {
-            m_tracker.erase(it);
-            if (m_tracker.empty()) m_cv.notify_all();
-        }
+        m_tracker.erase(it);
+        if (m_tracker.empty()) m_cv.notify_all();
     }
 public:
     //! Increase request counter for the associated connection by 1
@@ -192,13 +189,15 @@ public:
         LOCK(m_mutex);
         auto it{m_tracker.find(conn)};
         if(it != m_tracker.end() && it->second > 0) {
-            if(--(it->second) == 0) RemoveConnectionInternal(conn);
+            if(--(it->second) == 0) RemoveConnectionInternal(it);
         }
     }
     //! Remove a connection entirely
     void RemoveConnection(const evhttp_connection* conn)
     {
-        WITH_LOCK(m_mutex, RemoveConnectionInternal(conn));
+        LOCK(m_mutex);
+        auto it{m_tracker.find(Assert(conn))};
+        if (it != m_tracker.end()) RemoveConnectionInternal(it);
     }
     size_t CountActiveConnections() const { return WITH_LOCK(m_mutex, return m_tracker.size()); }
     //! Wait until there are no more connections with active requests in the tracker
