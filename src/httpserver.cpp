@@ -174,11 +174,8 @@ public:
     {
         const evhttp_connection* conn{Assert(evhttp_request_get_connection(Assert(req)))};
         LOCK(m_mutex);
-        auto it{m_tracker.find(conn)};
-        if (it == m_tracker.end()) {
-            // new connection, initialize counter to 1
-            m_tracker[conn] = 1;
-        } else {
+        const auto& [it, inserted] = m_tracker.insert({conn, 1});
+        if (!inserted) {
             ++(it->second);
         }
     }
